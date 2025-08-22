@@ -9,11 +9,11 @@ const API_BASE_URL =
 
 export default function Sales() {
   const [search, setSearch] = useState("");
-  const [products, setProducts] = useState([]); // load products from DB
-  const [items, setItems] = useState([]);
+  const [products, setProducts] = useState([]); // products from DB
+  const [items, setItems] = useState([]); // cart
   const [error, setError] = useState("");
+  const [discount, setDiscount] = useState(0); // % discount
 
-  // Load products from backend when page loads
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -58,9 +58,61 @@ export default function Sales() {
     );
   }
 
+  async function handlePay() {
+    if (items.length === 0) return alert("Cart is empty!");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/sales`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          items: items.map((it) => ({
+            productId: it._id,
+            qty: it.qty,
+          })),
+          discount,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to complete sale");
+
+      const result = await response.json();
+      alert("Sale completed successfully ✅");
+
+      // refresh stock
+      fetchProducts();
+      // clear cart
+      setItems([]);
+      setDiscount(0);
+    } catch (err) {
+      console.error("Error processing payment:", err);
+      alert("Payment failed. Please try again.");
+    }
+  }
+
+  function handleCancel() {
+    if (window.confirm("Cancel this transaction?")) {
+      setItems([]);
+      setDiscount(0);
+    }
+  }
+
+  function handleDiscount() {
+    const val = prompt("Enter discount percentage (e.g., 10 for 10%)", discount);
+    if (val !== null && !isNaN(val)) {
+      setDiscount(Math.min(Math.max(Number(val), 0), 100)); // clamp 0-100%
+    }
+  }
+
+  // Calculations
   const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-  const tax = subtotal * 0.16;
-  const total = subtotal + tax;
+  const discountedSubtotal = subtotal * (1 - discount / 100);
+  const tax = discountedSubtotal * 0.16;
+  const total = discountedSubtotal + tax;
 
   return (
     <div className="page-root sales-root">
@@ -74,9 +126,7 @@ export default function Sales() {
           />
         </div>
 
-        {error && (
-          <div style={{ color: "red", margin: "10px 0" }}>{error}</div>
-        )}
+        {error && <div style={{ color: "red", margin: "10px 0" }}>{error}</div>}
 
         <div className="product-grid">
           {products
@@ -142,6 +192,12 @@ export default function Sales() {
             <span>Subtotal</span>
             <span>Ksh {subtotal.toFixed(2)}</span>
           </div>
+          {discount > 0 && (
+            <div className="line">
+              <span>Discount ({discount}%)</span>
+              <span>- Ksh {(subtotal - discountedSubtotal).toFixed(2)}</span>
+            </div>
+          )}
           <div className="line">
             <span>Tax (16%)</span>
             <span>Ksh {tax.toFixed(2)}</span>
@@ -152,9 +208,15 @@ export default function Sales() {
           </div>
 
           <div className="action-row">
-            <button className="green">Pay</button>
-            <button className="red">Cancel</button>
-            <button className="yellow">Add Discount</button>
+            <button className="green" onClick={handlePay}>
+              Pay
+            </button>
+            <button className="red" onClick={handleCancel}>
+              Cancel
+            </button>
+            <button className="yellow" onClick={handleDiscount}>
+              Add Discount
+            </button>
           </div>
         </div>
       </div>
