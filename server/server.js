@@ -16,17 +16,19 @@ app.get('/api/health', (req, res) => {
   res.json({ message: 'POS Backend is running!' });
 });
 
-// Import routes (we'll create these next)
+// Import routes
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
 const salesRoutes = require('./routes/sales');
 const userRoutes = require('./routes/users');
+const reportRoutes = require('./routes/reports'); // ✅ NEW
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/reports', reportRoutes); // ✅ NEW
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/pos_system')
