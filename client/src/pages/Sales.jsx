@@ -9,10 +9,10 @@ const API_BASE_URL =
 
 export default function Sales() {
   const [search, setSearch] = useState("");
-  const [products, setProducts] = useState([]); // products from DB
+  const [products, setProducts] = useState([]);
   const [items, setItems] = useState([]); // cart
   const [error, setError] = useState("");
-  const [discount, setDiscount] = useState(0); // % discount
+  const [discount, setDiscount] = useState(0);
 
   useEffect(() => {
     fetchProducts();
@@ -28,9 +28,7 @@ export default function Sales() {
           ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
-
       if (!response.ok) throw new Error("Failed to fetch products");
-
       const data = await response.json();
       setProducts(data);
     } catch (err) {
@@ -62,6 +60,24 @@ export default function Sales() {
     if (items.length === 0) return alert("Cart is empty!");
 
     try {
+      const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+      const discountedSubtotal = subtotal * (1 - discount / 100);
+      const tax = discountedSubtotal * 0.16;
+      const total = discountedSubtotal + tax;
+
+      const payload = {
+        items: items.map((it) => ({
+          productId: it._id,
+          name: it.name,
+          price: it.price,
+          qty: it.qty,
+        })),
+        subtotal,
+        tax,
+        total,
+        paymentMethod: "cash", // hardcoded for now
+      };
+
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}/api/sales`, {
         method: "POST",
@@ -69,16 +85,13 @@ export default function Sales() {
           "Content-Type": "application/json",
           ...(token && { Authorization: `Bearer ${token}` }),
         },
-        body: JSON.stringify({
-          items: items.map((it) => ({
-            productId: it._id,
-            qty: it.qty,
-          })),
-          discount,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Failed to complete sale");
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Failed to complete sale");
+      }
 
       const result = await response.json();
       alert("Sale completed successfully ✅");
@@ -104,11 +117,10 @@ export default function Sales() {
   function handleDiscount() {
     const val = prompt("Enter discount percentage (e.g., 10 for 10%)", discount);
     if (val !== null && !isNaN(val)) {
-      setDiscount(Math.min(Math.max(Number(val), 0), 100)); // clamp 0-100%
+      setDiscount(Math.min(Math.max(Number(val), 0), 100));
     }
   }
 
-  // Calculations
   const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
   const discountedSubtotal = subtotal * (1 - discount / 100);
   const tax = discountedSubtotal * 0.16;
@@ -136,11 +148,7 @@ export default function Sales() {
                 p.barcode.includes(search)
             )
             .map((p) => (
-              <div
-                key={p._id}
-                className="product-card"
-                onClick={() => add(p)}
-              >
+              <div key={p._id} className="product-card" onClick={() => add(p)}>
                 <div className="pname">{p.name}</div>
                 <div className="pprice">Ksh {p.price.toFixed(2)}</div>
               </div>
