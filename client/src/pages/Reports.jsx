@@ -12,21 +12,22 @@ export default function Reports() {
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
 
   useEffect(() => {
-    axios.get("/api/reports/low-stock").then((res) => setLowStock(res.data));
-    axios.get("/api/reports/sales-by-day").then((res) => setSalesByDay(res.data));
-    axios.get("/api/reports/top-products").then((res) => setTopProducts(res.data));
-    axios.get("/api/reports/monthly-revenue").then((res) =>
-      setMonthlyRevenue(res.data.totalRevenue || 0)
-    );
+    axios.get("/api/reports").then((res) => {
+      setLowStock(res.data.lowStock || []);
+      setSalesByDay(res.data.salesByDay || []);
+      setTopProducts(res.data.topProducts || []);
+      setMonthlyRevenue(res.data.monthlyRevenue || 0);
+    });
   }, []);
 
   const exportCSV = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { MonthlyRevenue: monthlyRevenue },
-      ...salesByDay,
-      ...topProducts,
-      ...lowStock
-    ]);
+    const data = {
+      MonthlyRevenue: monthlyRevenue,
+      SalesByDay: salesByDay,
+      TopProducts: topProducts,
+      LowStock: lowStock,
+    };
+    const ws = XLSX.utils.json_to_sheet([data]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     XLSX.writeFile(wb, "report.xlsx");
@@ -36,13 +37,13 @@ export default function Reports() {
     const doc = new jsPDF();
     doc.text("Supermarket Report", 14, 10);
     doc.autoTable({
-      head: [["Type", "Details"]],
+      head: [["Section", "Details"]],
       body: [
-        ["Monthly Revenue", monthlyRevenue],
-        ["Low Stock", JSON.stringify(lowStock)],
-        ["Sales By Day", JSON.stringify(salesByDay)],
-        ["Top Products", JSON.stringify(topProducts)]
-      ]
+        ["Monthly Revenue", `$${monthlyRevenue}`],
+        ["Low Stock", lowStock.map(p => `${p.name} (${p.quantity})`).join(", ")],
+        ["Sales By Day", salesByDay.map(s => `${s._id}: ${s.total}`).join(", ")],
+        ["Top Products", topProducts.map(p => `${p.name} (${p.totalSold})`).join(", ")]
+      ],
     });
     doc.save("report.pdf");
   };
@@ -68,7 +69,7 @@ export default function Reports() {
           <ul>
             {salesByDay.map((s) => (
               <li key={s._id}>
-                {s._id}: {s.totalSales}
+                {s._id}: {s.total}
               </li>
             ))}
           </ul>
@@ -79,7 +80,7 @@ export default function Reports() {
           <ul>
             {topProducts.map((p) => (
               <li key={p._id}>
-                {p.name} - {p.totalQty} sold
+                {p.name} - {p.totalSold} sold
               </li>
             ))}
           </ul>
