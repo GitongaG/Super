@@ -1,31 +1,32 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 export default function Reports() {
   const [lowStock, setLowStock] = useState([]);
-  const [salesByDay, setSalesByDay] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  const [salesByDay, setSalesByDay] = useState([]);
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+  const [todaysRevenue, setTodaysRevenue] = useState(0);
 
   useEffect(() => {
     axios.get("/api/reports").then((res) => {
       setLowStock(res.data.lowStock || []);
-      setSalesByDay(res.data.salesByDay || []);
       setTopProducts(res.data.topProducts || []);
+      setSalesByDay(res.data.salesByDay || []);
       setMonthlyRevenue(res.data.monthlyRevenue || 0);
+      setTodaysRevenue(res.data.todaysRevenue || 0);
     });
   }, []);
 
   const exportCSV = () => {
     const data = {
-      MonthlyRevenue: monthlyRevenue,
-      SalesByDay: salesByDay,
-      TopProducts: topProducts,
-      LowStock: lowStock,
+      "Today's Revenue": todaysRevenue,
+      "Monthly Revenue": monthlyRevenue,
+      "Top Products": topProducts.map((p) => `${p.name} (${p.totalSold})`).join(", "),
+      "Low Stock": lowStock.map((p) => `${p.name} (${p.quantity})`).join(", "),
     };
     const ws = XLSX.utils.json_to_sheet([data]);
     const wb = XLSX.utils.book_new();
@@ -39,10 +40,10 @@ export default function Reports() {
     doc.autoTable({
       head: [["Section", "Details"]],
       body: [
-        ["Monthly Revenue", `$${monthlyRevenue}`],
-        ["Low Stock", lowStock.map(p => `${p.name} (${p.quantity})`).join(", ")],
-        ["Sales By Day", salesByDay.map(s => `${s._id}: ${s.total}`).join(", ")],
-        ["Top Products", topProducts.map(p => `${p.name} (${p.totalSold})`).join(", ")]
+        ["Today's Revenue", `Ksh ${todaysRevenue}`],
+        ["Monthly Revenue", `Ksh ${monthlyRevenue}`],
+        ["Top Products", topProducts.map((p) => `${p.name} (${p.totalSold})`).join(", ")],
+        ["Low Stock", lowStock.map((p) => `${p.name} (${p.quantity})`).join(", ")],
       ],
     });
     doc.save("report.pdf");
@@ -52,7 +53,7 @@ export default function Reports() {
     <div className="page-root">
       <h2>Reports</h2>
 
-      <div className="panel">
+      <div className="panel grid grid-cols-2 gap-4">
         <div className="report-card">
           <h3>Low Stock (below 5 units)</h3>
           <ul>
@@ -62,17 +63,7 @@ export default function Reports() {
               </li>
             ))}
           </ul>
-        </div>
-
-        <div className="report-card">
-          <h3>Sales by Day</h3>
-          <ul>
-            {salesByDay.map((s) => (
-              <li key={s._id}>
-                {s._id}: {s.total}
-              </li>
-            ))}
-          </ul>
+          <button onClick={exportCSV}>Export as Excel</button>
         </div>
 
         <div className="report-card">
@@ -87,12 +78,23 @@ export default function Reports() {
         </div>
 
         <div className="report-card">
-          <h3>Total Monthly Revenue</h3>
-          <p>${monthlyRevenue}</p>
+          <h3>Sales Totals</h3>
+          <p>Today: Ksh {todaysRevenue}</p>
+          <p>This Month: Ksh {monthlyRevenue}</p>
         </div>
 
         <div className="report-card">
-          <button onClick={exportCSV}>Export CSV/Excel</button>
+          <h3>Sales by Day (last 30 days)</h3>
+          <ul>
+            {salesByDay.map((s) => (
+              <li key={s._id}>
+                {s._id}: Ksh {s.total}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="report-card">
           <button onClick={exportPDF}>Export PDF</button>
         </div>
       </div>
